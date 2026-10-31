@@ -1,0 +1,15 @@
+export const TPD = 360
+export const SQRT_TPD = Math.sqrt(TPD)
+export const BAR_TICKS = 5
+export const TICK_MS_GAME = 240000
+export const EPOCH_MS = Date.UTC(2031, 0, 1, 0, 0, 0)
+export const SIM_VERSION = 1
+export const FORMAT_VERSION = 1
+export const WARMUP_DAYS = 14
+export const MAX_EVENT_DAYS = 14
+export const MOOD_DRIFT = 0.008 / TPD
+export const PULL_K = 0.0003
+export const MOMENTUM = 0.1
+export const JUMP_P = 0.0006
+export const EQUITY_STEP = 15
+export const UNIT = 1_000_000
