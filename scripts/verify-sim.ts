@@ -28,12 +28,36 @@ function digest(g: ReturnType<typeof run>): string {
 
 const a = run('verify-1', 60)
 const b = run('verify-1', 60)
+console.log('new game has MSR:', a.coins.some(c => c.id === 'msr' && c.startPrice === 1) ? 'OK' : 'FAIL')
 console.log('determinism same seed:', digest(a) === digest(b) ? 'OK' : 'FAIL')
 const c = run('verify-2', 60)
 console.log('different seed differs:', digest(a) !== digest(c) ? 'OK' : 'FAIL')
 
 const g1 = run('verify-1', 20)
+const freshAtSameTick = run('verify-1', 20)
 const buy = executeTrade(g1, 'buy', 'sdc', 3_500_000)
+const legacy = JSON.parse(serialize(g1))
+legacy.state.coins = legacy.state.coins.filter((c: { id: string }) => c.id !== 'msr')
+delete legacy.state.markets.msr
+const legacyCash = legacy.state.cash
+const migrated = deserialize(JSON.stringify(legacy))
+console.log(
+	'legacy migration:',
+	migrated.coins.some(c => c.id === 'msr') &&
+		migrated.markets.msr.bars[migrated.markets.msr.bars.length - 1][0] <= migrated.tick &&
+		migrated.cash === legacyCash &&
+			migrated.markets.msr.price === freshAtSameTick.markets.msr.price
+		? 'OK'
+		: 'FAIL'
+)
+const migratedAgain = deserialize(serialize(migrated))
+console.log(
+	'migration idempotent:',
+	migratedAgain.coins.filter(c => c.id === 'msr').length === 1 &&
+		digest(migratedAgain) === digest(migrated)
+		? 'OK'
+		: 'FAIL'
+)
 const g2 = deserialize(serialize(g1))
 for (let i = 0; i < 20 * TPD; i++) {
 	stepGame(g1)

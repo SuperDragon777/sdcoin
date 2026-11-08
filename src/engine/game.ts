@@ -37,6 +37,20 @@ export const defaultAudio = (): AudioSettings => ({
 	sfxOn: true
 })
 
+const msrCoin = (): Coin => ({
+	id: 'msr',
+	name: 'MUSORcoin',
+	ticker: 'MSR',
+	startPrice: 1,
+	volatility: 0.008,
+	drift: 0.00005,
+	beta: 0.15,
+	baseVolume: 1_000_000,
+	color: '#8e44ad',
+	description: 'Дешёвая стабильная монета с небольшими рыночными колебаниями.',
+	createdTick: 0
+})
+
 export const defaultCoins = (): Coin[] => [
 	{
 		id: 'sdc',
@@ -65,8 +79,22 @@ export const defaultCoins = (): Coin[] => [
 		description:
 			'Более рискованный актив: сильнее реагирует на новости и настроения рынка.',
 		createdTick: 0
-	}
+	},
+	msrCoin()
 ]
+
+function buildCoinState(g: GameState, c: Coin, tick: number) {
+	const replay = { ...g, tick: 0, phaseOverride: null }
+	const def = PHASES[segmentAt(g.seed, 0).phase]
+	replay.mood = def.mood
+	replay.cycleVol = def.vol
+	const state = initCoinState(replay, c, c.createdTick)
+	for (let t = c.createdTick + 1; t <= tick; t++) {
+		updateMood(replay, t)
+		stepCoin(replay, c, state, t, activeEvents(replay, t), true)
+	}
+	return state
+}
 
 const published = new WeakMap<GameState, Set<string>>()
 
@@ -353,18 +381,6 @@ export function deserialize(text: string): GameState {
 	) {
 		throw new Error('В файле не хватает данных игры.')
 	}
-	for (const c of s.coins as Coin[]) {
-		const m = s.markets[c.id]
-		if (
-			!m ||
-			!Array.isArray(m.bars) ||
-			m.bars.length === 0 ||
-			!Array.isArray(m.rng) ||
-			m.rng.length < 4
-		) {
-			throw new Error(`В файле нет данных рынка для монеты «${c.ticker}».`)
-		}
-	}
 	const g = s as GameState
 	g.settings = { ...defaultSettings(), ...(g.settings ?? {}) }
 	g.audio = { ...defaultAudio(), ...(g.audio ?? {}) }
@@ -388,6 +404,23 @@ export function deserialize(text: string): GameState {
 	g.mood = num(g.mood, 0)
 	g.cycleVol = num(g.cycleVol, 1)
 	g.simVersion = num(g.simVersion, SIM_VERSION)
+	if (!g.coins.some(c => c.id === 'msr')) {
+		const c = msrCoin()
+		g.coins.push(c)
+		g.markets[c.id] = buildCoinState(g, c, g.tick)
+	}
+	for (const c of g.coins) {
+		const m = g.markets[c.id]
+		if (
+			!m ||
+			!Array.isArray(m.bars) ||
+			 m.bars.length === 0 ||
+			!Array.isArray(m.rng) ||
+			 m.rng.length < 4
+		) {
+			throw new Error(`В файле нет данных рынка для монеты «${c.ticker}».`)
+		}
+	}
 	return g
 }
 
